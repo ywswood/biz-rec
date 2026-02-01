@@ -2,18 +2,18 @@
 // 設定
 // ==========================================
 const CONFIG = {
-  CLIENT_ID: '1063787713722-e4lecpqtmp5i2uubvmcvrgcq5iaf4l0.apps.googleusercontent.com',
+  CLIENT_ID: '1063787713722-6tlecpqtmp5i2uubvmcvrgcq5islr4i0.apps.googleusercontent.com',
   SCOPES: 'https://www.googleapis.com/auth/drive.file',
   DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-  
+
   // Google Drive フォルダID
   VOICE_FOLDER_ID: '1Drp4_rkJsLpdC49tzRDACcCnQb_ywl4h', // voice フォルダ
-  
+
   // 録音設定
   CHUNK_DURATION: 5 * 60 * 1000, // 5分（ミリ秒）
   MAX_DURATION: 60 * 60 * 1000,  // 60分（ミリ秒）
   MAX_CHUNKS: 12,                 // 最大チャンク数（60分 / 5分）
-  
+
   // 音声設定
   MIME_TYPE: 'audio/webm;codecs=opus',
   FILE_EXTENSION: '.webm'
@@ -62,7 +62,7 @@ window.onload = () => {
 // ==========================================
 function handleAuth() {
   log('Google認証を開始...');
-  
+
   const client = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: CONFIG.SCOPES,
@@ -71,16 +71,16 @@ function handleAuth() {
         log(`❌ 認証エラー: ${response.error}`, 'error');
         return;
       }
-      
+
       accessToken = response.access_token;
       log('✅ 認証成功');
-      
+
       // UIを切り替え
       authSection.classList.add('hidden');
       mainSection.classList.remove('hidden');
     },
   });
-  
+
   client.requestAccessToken();
 }
 
@@ -90,33 +90,33 @@ function handleAuth() {
 async function startRecording() {
   try {
     log('録音を開始します...');
-    
+
     // マイク権限を取得
-    audioStream = await navigator.mediaDevices.getUserMedia({ 
+    audioStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         sampleRate: 48000
-      } 
+      }
     });
-    
+
     log('✅ マイク接続成功');
-    
+
     // MediaRecorderを初期化
     mediaRecorder = new MediaRecorder(audioStream, {
       mimeType: CONFIG.MIME_TYPE,
       audioBitsPerSecond: 128000 // 128kbps
     });
-    
+
     // セッションIDを生成（YYMMDDHHmmss形式）
     const now = new Date();
-    sessionId = formatDate(now) + '_' + 
-                String(now.getHours()).padStart(2, '0') + 
-                String(now.getMinutes()).padStart(2, '0') + 
-                String(now.getSeconds()).padStart(2, '0');
-    
+    sessionId = formatDate(now) + '_' +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+
     log(`📝 セッションID: ${sessionId}`);
-    
+
     // 録音データの蓄積
     audioChunks = [];
     mediaRecorder.ondataavailable = (event) => {
@@ -124,28 +124,28 @@ async function startRecording() {
         audioChunks.push(event.data);
       }
     };
-    
+
     // 録音開始
     recordingStartTime = Date.now();
     currentChunk = 0;
     uploadedChunks = 0;
-    
+
     mediaRecorder.start();
-    
+
     // UIを更新
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
     statusText.innerHTML = '<span class="recording-indicator"></span>録音中';
     chunkList.style.display = 'block';
-    
+
     // タイマー開始
     startTimer();
-    
+
     // 5分ごとのチャンク処理
     scheduleNextChunk();
-    
+
     log('🎤 録音開始');
-    
+
   } catch (error) {
     log(`❌ 録音開始エラー: ${error.message}`, 'error');
   }
@@ -156,17 +156,17 @@ async function startRecording() {
 // ==========================================
 function stopRecording() {
   log('録音を停止します...');
-  
+
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
-    
+
     // 最後のチャンクを処理
     mediaRecorder.onstop = async () => {
       if (audioChunks.length > 0) {
         currentChunk++;
         await processChunk();
       }
-      
+
       cleanup();
       log('✅ 録音完了');
     };
@@ -182,14 +182,14 @@ function scheduleNextChunk() {
   chunkInterval = setTimeout(async () => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       log(`⏸️ チャンク ${currentChunk + 1} を保存中...`);
-      
+
       // 録音を一時停止してチャンクを確定
       mediaRecorder.stop();
-      
+
       mediaRecorder.onstop = async () => {
         currentChunk++;
         await processChunk();
-        
+
         // 60分に達していない場合は録音を再開
         const elapsed = Date.now() - recordingStartTime;
         if (elapsed < CONFIG.MAX_DURATION && currentChunk < CONFIG.MAX_CHUNKS) {
@@ -210,25 +210,25 @@ function scheduleNextChunk() {
 // ==========================================
 async function processChunk() {
   if (audioChunks.length === 0) return;
-  
+
   const blob = new Blob(audioChunks, { type: CONFIG.MIME_TYPE });
   const chunkNumber = String(currentChunk).padStart(2, '0');
   const fileName = `${sessionId}_chunk${chunkNumber}${CONFIG.FILE_EXTENSION}`;
-  
+
   log(`📤 アップロード中: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
-  
+
   // チャンクリストに追加
   addChunkToList(fileName, 'アップロード中...');
-  
+
   try {
     await uploadToDrive(blob, fileName);
-    
+
     uploadedChunks++;
     updateChunkInList(fileName, 'uploaded');
-    
+
     log(`✅ アップロード完了: ${fileName}`);
     updateUI();
-    
+
   } catch (error) {
     log(`❌ アップロード失敗: ${error.message}`, 'error');
     updateChunkInList(fileName, '失敗');
@@ -244,11 +244,11 @@ async function uploadToDrive(blob, fileName) {
     mimeType: CONFIG.MIME_TYPE,
     parents: [CONFIG.VOICE_FOLDER_ID]
   };
-  
+
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', blob);
-  
+
   const response = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
     {
@@ -259,12 +259,12 @@ async function uploadToDrive(blob, fileName) {
       body: form
     }
   );
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error?.message || 'アップロード失敗');
   }
-  
+
   return await response.json();
 }
 
@@ -276,13 +276,13 @@ function startTimer() {
     const elapsed = Date.now() - recordingStartTime;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
-    
+
     timer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    
+
     // プログレスバー更新
     const progress = Math.min((elapsed / CONFIG.MAX_DURATION) * 100, 100);
     progressBar.style.width = `${progress}%`;
-    
+
   }, 100);
 }
 
@@ -326,28 +326,28 @@ function cleanup() {
     clearInterval(timerInterval);
     timerInterval = null;
   }
-  
+
   if (chunkInterval) {
     clearTimeout(chunkInterval);
     chunkInterval = null;
   }
-  
+
   // ストリーム停止
   if (audioStream) {
     audioStream.getTracks().forEach(track => track.stop());
     audioStream = null;
   }
-  
+
   // MediaRecorder解放
   if (mediaRecorder) {
     mediaRecorder = null;
   }
-  
+
   // UI復元
   startBtn.classList.remove('hidden');
   stopBtn.classList.add('hidden');
   statusText.textContent = '完了';
-  
+
   log('🛑 録音停止・リソース解放完了');
 }
 
@@ -357,14 +357,14 @@ function cleanup() {
 function log(message, type = 'info') {
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-  
+
   const entry = document.createElement('div');
   entry.className = 'log-entry';
   entry.innerHTML = `<span class="log-time">[${timeStr}]</span>${message}`;
-  
+
   logBox.appendChild(entry);
   logBox.scrollTop = logBox.scrollHeight;
-  
+
   console.log(`[${timeStr}] ${message}`);
 }
 
