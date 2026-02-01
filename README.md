@@ -39,8 +39,7 @@
 biz-record/
 ├── index.html      ← メイン画面
 ├── app.js          ← 録音・アップロード処理
-├── manifest.json   ← PWA設定
-└── api_bank.js     ← API Bank (参考資料)
+└── manifest.json   ← PWA設定
 ```
 
 #### ローカルテスト用サーバー起動

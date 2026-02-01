@@ -4,21 +4,11 @@
  * 🟢 このファイルの中身をすべてコピーして、GASに貼り付けてください
  * ========================================================================
  * 
- * 【機能】
- * 1. voiceフォルダ内の音声ファイルを自動検出
- * 2. api_bank経由でGemini APIを使って文字起こし
- * 3. テキストをdocフォルダに保存（YYMMDD_01形式・連番管理）
- * 4. 処理済み音声ファイルを削除
- * 5. 同一セッションの全チャンクが完了したらテキスト結合
- * 
- * 【設定方法】
- * 1. このコードをGoogle Apps Scriptプロジェクトに貼り付け
- * 2. トリガー設定：「processVoiceFiles」関数を「時間主導型」「1分ごと」で実行
- * 3. 初回実行時に権限承認が必要です
- * 
- * 【api_bank連携】
- * - BANK_URLとBANK_PASSは実際の値に置き換えてください
- * - 503エラー対応済み（最大3回リトライ）
+ * 【デバッグ版 - ログ出力強化】
+ * - Gemini APIリクエスト前後のログ追加
+ * - Base64エンコードサイズのログ追加
+ * - タイムアウト設定追加（300秒）
+ * - レスポンスステータスコードのログ追加
  */
 
 // ==========================================
@@ -26,7 +16,7 @@
 // ==========================================
 const CONFIG = {
   // API Bank設定
-  BANK_URL: 'https://script.google.com/macros/s/AKfycbxCscLkbbvTUU7sqpZSayJ8pEQlWl8mrEBaSy_FklbidJRc649HwWc4SF0Q3GvUQZbuGA/exec', // 実際のURL
+  BANK_URL: 'https://script.google.com/macros/s/AKfycbxCscLkbbvTUU7sqpZSayJ8pEQlWl8mrEBaSy_FklbidJRc649HwWc4SF0Q3GvUQZbuGA/exec',
   BANK_PASS: '1030013',
   PROJECT_NAME: 'biz-record',
 
@@ -37,6 +27,9 @@ const CONFIG = {
   // リトライ設定
   MAX_RETRIES: 3,
   RETRY_DELAY: 2000, // ミリ秒
+
+  // タイムアウト設定（秒）
+  API_TIMEOUT: 300, // 5分
 
   // プロンプト
   TRANSCRIPTION_PROMPT: `
@@ -123,6 +116,7 @@ async function processVoiceFiles() {
 
       } catch (error) {
         Logger.log(`❌ 処理エラー (${fileName}): ${error.message}`);
+        Logger.log(`❌ スタックトレース: ${error.stack}`);
       }
 
       // レート制限対策（1ファイルごとに少し待機）
@@ -138,6 +132,7 @@ async function processVoiceFiles() {
 
   } catch (error) {
     Logger.log(`❌ メイン処理エラー: ${error.message}`);
+    Logger.log(`❌ スタックトレース: ${error.stack}`);
   }
 }
 
@@ -145,9 +140,20 @@ async function processVoiceFiles() {
 // 音声文字起こし（Gemini API + api_bank）
 // ==========================================
 async function transcribeAudio(file) {
+  Logger.log(`🎵 音声ファイル情報:`);
+  Logger.log(`   - ファイル名: ${file.getName()}`);
+  Logger.log(`   - ファイルサイズ: ${file.getSize()} バイト (${(file.getSize() / 1024).toFixed(2)} KB)`);
+
   const blob = file.getBlob();
-  const base64Audio = Utilities.base64Encode(blob.getBytes());
   const mimeType = file.getMimeType();
+  Logger.log(`   - MIMEタイプ: ${mimeType}`);
+
+  Logger.log(`🔄 Base64エンコード開始...`);
+  const startEncode = Date.now();
+  const base64Audio = Utilities.base64Encode(blob.getBytes());
+  const encodeTime = Date.now() - startEncode;
+  Logger.log(`✅ Base64エンコード完了 (${encodeTime}ms)`);
+  Logger.log(`   - Base64サイズ: ${base64Audio.length} 文字 (約 ${(base64Audio.length / 1024).toFixed(2)} KB)`);
 
   let previousModel = null;
 
@@ -156,12 +162,22 @@ async function transcribeAudio(file) {
 
     try {
       // 1. API Bankからキー取得
+      Logger.log(`📡 API Bank リクエスト開始...`);
       let bankUrl = `${CONFIG.BANK_URL}?pass=${CONFIG.BANK_PASS}&project=${CONFIG.PROJECT_NAME}`;
       if (previousModel) {
         bankUrl += `&error_503=true&previous_model=${encodeURIComponent(previousModel)}`;
+        Logger.log(`   - 503エラー後のリトライ (previous_model: ${previousModel})`);
       }
 
-      const bankRes = UrlFetchApp.fetch(bankUrl, { muteHttpExceptions: true });
+      const bankStartTime = Date.now();
+      Logger.log(`🔗 リクエストURL: ${bankUrl}`);
+      const bankRes = UrlFetchApp.fetch(bankUrl, {
+        muteHttpExceptions: true,
+        timeout: 30 // 30秒
+      });
+      const bankTime = Date.now() - bankStartTime;
+      Logger.log(`✅ API Bank レスポンス受信 (${bankTime}ms)`);
+
       const bankData = JSON.parse(bankRes.getContentText());
 
       if (bankData.status !== 'success') {
@@ -171,9 +187,11 @@ async function transcribeAudio(file) {
 
       const { api_key, model_name } = bankData;
       Logger.log(`📦 モデル取得: ${model_name}`);
+      Logger.log(`🔑 APIキー取得: ${api_key.substring(0, 20)}...`);
 
       // 2. Gemini APIで文字起こし
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model_name}:generateContent?key=${api_key}`;
+      Logger.log(`📡 Gemini API リクエスト準備中...`);
 
       const payload = {
         contents: [{
@@ -191,14 +209,24 @@ async function transcribeAudio(file) {
         }]
       };
 
+      const payloadSize = JSON.stringify(payload).length;
+      Logger.log(`   - ペイロードサイズ: ${(payloadSize / 1024 / 1024).toFixed(2)} MB`);
+      Logger.log(`🚀 Gemini API リクエスト送信... (タイムアウト: ${CONFIG.API_TIMEOUT}秒)`);
+
+      const geminiStartTime = Date.now();
+
       const geminiRes = UrlFetchApp.fetch(apiUrl, {
         method: 'post',
         contentType: 'application/json',
         payload: JSON.stringify(payload),
-        muteHttpExceptions: true
+        muteHttpExceptions: true,
+        timeout: CONFIG.API_TIMEOUT // タイムアウト設定
       });
 
+      const geminiTime = Date.now() - geminiStartTime;
       const statusCode = geminiRes.getResponseCode();
+      Logger.log(`📥 Gemini API レスポンス受信 (${(geminiTime / 1000).toFixed(2)}秒)`);
+      Logger.log(`   - ステータスコード: ${statusCode}`);
 
       // 503エラー処理
       if (statusCode === 503) {
@@ -208,25 +236,41 @@ async function transcribeAudio(file) {
         continue;
       }
 
-      const geminiData = JSON.parse(geminiRes.getContentText());
+      const responseText = geminiRes.getContentText();
+      Logger.log(`   - レスポンスサイズ: ${responseText.length} 文字`);
+
+      const geminiData = JSON.parse(responseText);
 
       // エラーチェック
-      if (geminiData.error || !geminiData.candidates || geminiData.candidates.length === 0) {
-        Logger.log(`❌ Gemini APIエラー: ${JSON.stringify(geminiData)}`);
-        reportError(api_key); // 503以外のエラーは報告
+      if (geminiData.error) {
+        Logger.log(`❌ Gemini APIエラー: ${JSON.stringify(geminiData.error)}`);
+        reportError(api_key);
+        return null;
+      }
+
+      if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        Logger.log(`❌ 候補が返されませんでした: ${JSON.stringify(geminiData)}`);
+        reportError(api_key);
         return null;
       }
 
       // 成功
       const transcription = geminiData.candidates[0].content.parts[0].text;
       Logger.log(`✅ 文字起こし成功 (${transcription.length}文字)`);
+      Logger.log(`📝 先頭100文字: ${transcription.substring(0, 100)}...`);
       return transcription;
 
     } catch (error) {
       Logger.log(`❌ 例外発生: ${error.message}`);
+      Logger.log(`❌ エラータイプ: ${error.name}`);
+      Logger.log(`❌ スタックトレース: ${error.stack}`);
+
       if (attempt === CONFIG.MAX_RETRIES) {
+        Logger.log(`❌ 最大リトライ回数に達しました`);
         return null;
       }
+
+      Logger.log(`⏳ ${CONFIG.RETRY_DELAY}ms 待機後、再試行します...`);
       Utilities.sleep(CONFIG.RETRY_DELAY);
     }
   }
@@ -362,6 +406,7 @@ function generateSequentialFileName(sessionId) {
 // ==========================================
 function reportError(api_key) {
   try {
+    Logger.log(`📮 エラー報告送信中...`);
     UrlFetchApp.fetch(CONFIG.BANK_URL, {
       method: 'post',
       contentType: 'application/json',
@@ -369,7 +414,8 @@ function reportError(api_key) {
         pass: CONFIG.BANK_PASS,
         api_key: api_key
       }),
-      muteHttpExceptions: true
+      muteHttpExceptions: true,
+      timeout: 30
     });
     Logger.log('📮 エラー報告送信完了');
   } catch (error) {

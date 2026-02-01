@@ -59,6 +59,15 @@ window.onload = () => {
   authButton.addEventListener('click', handleAuth);
   startBtn.addEventListener('click', startRecording);
   stopBtn.addEventListener('click', stopRecording);
+
+  // 手動アップロード設定
+  const manualUploadBtn = document.getElementById('manualUploadBtn');
+  const manualFileInput = document.getElementById('manualFileInput');
+
+  if (manualUploadBtn && manualFileInput) {
+    manualUploadBtn.addEventListener('click', () => manualFileInput.click());
+    manualFileInput.addEventListener('change', handleManualUpload);
+  }
 };
 
 // ==========================================
@@ -236,9 +245,61 @@ async function processChunk() {
   } catch (error) {
     log(`❌ アップロード失敗: ${error.message}`, 'error');
     updateChunkInList(fileName, '失敗');
+
+    // 自動ダウンロード（救済措置）
+    log(`💾 自動保存を実行します: ${fileName}`);
+    downloadChunk(blob, fileName);
+    alert(`アップロードに失敗しました。\nファイル「${fileName}」を端末に保存しました。\n後で手動アップロードしてください。`);
   }
 }
 
+// ==========================================
+// 手動アップロード処理
+// ==========================================
+async function handleManualUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // ファイル名形式チェック
+  // 例: 240201_143000_chunk01.webm
+  const validPattern = /^\d{6}_\d{6}_chunk\d{2}\.webm$/;
+  if (!validPattern.test(file.name)) {
+    alert('⚠️ ファイル名が無効です。\n「YYMMDD_HHmmss_chunkXX.webm」の形式である必要があります。\n名前を変更せずにアップロードしてください。');
+    e.target.value = ''; // リセット
+    return;
+  }
+
+  log(`📤 手動アップロード開始: ${file.name}`);
+
+  try {
+    // FileオブジェクトはBlobの一種なのでそのまま渡せる
+    await uploadToDrive(file, file.name);
+    log(`✅ 手動アップロード成功: ${file.name}`);
+    alert(`アップロード成功: ${file.name}`);
+  } catch (error) {
+    log(`❌ 手動アップロード失敗: ${error.message}`, 'error');
+    alert(`アップロード失敗: ${error.message}`);
+  }
+
+  e.target.value = ''; // リセット
+}
+
+// ==========================================
+// ローカル保存（ダウンロード）
+// ==========================================
+function downloadChunk(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
 // ==========================================
 // Google Drive アップロード（マルチパート）
 // ==========================================
