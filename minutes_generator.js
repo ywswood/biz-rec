@@ -111,28 +111,43 @@ const MINUTES_PROMPTS = {
 // ==========================================
 // メイン処理（トリガー実行）
 // ==========================================
-async function processDocuments() {
+// ==========================================
+// 手動実行用 (待機時間を無視して強制実行)
+// ==========================================
+function manualRun() {
+    processDocuments(true);
+}
+
+// ==========================================
+// メイン処理（トリガー実行）
+// force = true の場合は待機時間を無視
+// ==========================================
+async function processDocuments(force = false) {
     try {
-        Logger.log('=== 書類生成処理を開始 ===');
+        Logger.log(`=== 書類生成処理を開始 (Force: ${force}) ===`);
 
         const txtFolder = DriveApp.getFolderById(MINUTES_CONFIG.TXT_FOLDER_ID);
         const docFolder = DriveApp.getFolderById(MINUTES_CONFIG.DOC_FOLDER_ID);
         const files = txtFolder.getFilesByType(MimeType.PLAIN_TEXT);
 
         let processedCount = 0;
-        const STABILITY_THRESHOLD_MS = 20 * 60 * 1000; // 20分以内の更新は処理しない（会議中とみなす）
+        const STABILITY_THRESHOLD_MS = 20 * 60 * 1000; // 20分以内の更新は処理しない
 
         while (files.hasNext()) {
             const file = files.next();
-            const fileName = file.getName(); // 例: 260201_150000.txt (セッションファイル)
+            const fileName = file.getName(); // 例: 260201_150000.txt
 
-            // 更新から20分経過していないファイルはスキップ（まだ録音中かもしれない）
-            const lastUpdated = file.getLastUpdated().getTime();
-            const now = Date.now();
+            // 強制実行でない場合のみ、待機判定を行う
+            if (!force) {
+                const lastUpdated = file.getLastUpdated().getTime();
+                const now = Date.now();
 
-            if (now - lastUpdated < STABILITY_THRESHOLD_MS) {
-                Logger.log(`⏳ 待機中（更新直後）: ${fileName}`);
-                continue;
+                if (now - lastUpdated < STABILITY_THRESHOLD_MS) {
+                    Logger.log(`⏳ 待機中（更新直後）: ${fileName}`);
+                    continue;
+                }
+            } else {
+                Logger.log(`⚡ 強制実行: ${fileName}（待機時間をスキップします）`);
             }
 
             const baseName = fileName.replace('.txt', '');
