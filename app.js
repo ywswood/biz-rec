@@ -20,7 +20,11 @@ const CONFIG = {
 
   // 音声設定
   MIME_TYPE: 'audio/webm;codecs=opus',
-  FILE_EXTENSION: '.webm'
+  FILE_EXTENSION: '.webm',
+
+  // 報告書作成API (GAS Web App URL)
+  // ※デプロイ後にURLをここに貼り付けてください
+  REPORT_API_URL: 'https://script.google.com/macros/s/AKfycbxnCcHDuh4TH6s9AkLQMPIr6fPgT4IHsIIpak_zUtZaXsDuOOwfRUg_-rByXrIy7WyHmw/exec'
 };
 
 // ==========================================
@@ -76,6 +80,12 @@ window.onload = () => {
   if (manualUploadBtn && manualFileInput) {
     manualUploadBtn.addEventListener('click', () => manualFileInput.click());
     manualFileInput.addEventListener('change', handleManualUpload);
+  }
+
+  // 報告書作成ボタン
+  const createReportBtn = document.getElementById('createReportBtn');
+  if (createReportBtn) {
+    createReportBtn.addEventListener('click', handleCreateReport);
   }
 
   // セッション復元チェック
@@ -321,6 +331,48 @@ async function handleManualUpload(e) {
   }
 
   e.target.value = ''; // リセット
+}
+
+// ==========================================
+// 報告書作成リクエスト
+// ==========================================
+async function handleCreateReport() {
+  if (!CONFIG.REPORT_API_URL) {
+    alert('⚠️ GAS WebアプリのURLが設定されていません。\napp.jsの CONFIG.REPORT_API_URL を設定してください。');
+    return;
+  }
+
+  if (!confirm('報告書を作成しますか？\n（すべての音声アップロードが完了していることを確認してください）')) {
+    return;
+  }
+
+  log('📑 報告書作成をリクエスト中...');
+  const btn = document.getElementById('createReportBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 作成中...';
+
+  try {
+    // GAS Web App へ POST リクエスト
+    // no-cors モード: レスポンスの中身は見れないが、実行はされる
+    await fetch(CONFIG.REPORT_API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ action: 'create_report' })
+    });
+
+    log('✅ 作成リクエストを送信しました。メールを確認してください。');
+    alert('リクエストを受け付けました。\n処理完了まで数分かかる場合があります。\n完了後、メールで通知されます。');
+
+  } catch (error) {
+    log(`❌ リクエスト送信失敗: ${error.message}`, 'error');
+    alert('送信に失敗しました。');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📑 報告書を作成して送信';
+  }
 }
 
 // ==========================================
