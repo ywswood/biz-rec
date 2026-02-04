@@ -8,27 +8,22 @@
 // ==========================================
 // 設定 (MINUTES_CONFIG)
 // ==========================================
+// スクリプトプロパティから取得
+const minutesProps = PropertiesService.getScriptProperties().getProperties();
+
 const MINUTES_CONFIG = {
-    // API Bank設定
-    BANK_URL: 'https://script.google.com/macros/s/AKfycbxCscLkbbvTUU7sqpZSayJ8pEQlWl8mrEBaSy_FklbidJRc649HwWc4SF0Q3GvUQZbuGA/exec',
-    BANK_PASS: '1030013',
-    PROJECT_NAME: 'biz-record',
-
-    // Google Driveフォルダ
-    TXT_FOLDER_ID: '11gbAyd8kdgZN8bD29PDAm32B0LuboVtq', // 読み込み元
-    DOC_FOLDER_ID: '1s3X47RZlrgDc3_MZQSgp5v9TvM8EUt_i', // 保存先
-    VOICE_FOLDER_ID: '1Drp4_rkJsLpdC49tzRDACcCnQb_ywl4h', // 画像検索用
-
-    // メール通知先
-    NOTIFICATION_EMAIL: 'y-inoue@woodstock.co.jp',
-
-    // サンプル画像名
-    SAMPLE_IMAGE_NAME: 'sample_product.png',
-
-    // リトライ設定
-    MAX_RETRIES: 3,
-    RETRY_DELAY: 2000,
-    API_TIMEOUT: 300 // 5分
+    BANK_URL: minutesProps.BANK_URL,
+    BANK_PASS: minutesProps.BANK_PASS,
+    PROJECT_NAME: minutesProps.PROJECT_NAME,
+    TXT_FOLDER_ID: minutesProps.TXT_FOLDER_ID,
+    DOC_FOLDER_ID: minutesProps.DOC_FOLDER_ID,
+    ARCH_FOLDER_ID: minutesProps.ARCH_FOLDER_ID,
+    VOICE_FOLDER_ID: minutesProps.VOICE_FOLDER_ID,
+    NOTIFICATION_EMAIL: minutesProps.NOTIFICATION_EMAIL,
+    SAMPLE_IMAGE_NAME: minutesProps.SAMPLE_IMAGE_NAME || 'sample_product.png',
+    MAX_RETRIES: parseInt(minutesProps.MAX_RETRIES || '3', 10),
+    RETRY_DELAY: parseInt(minutesProps.RETRY_DELAY || '2000', 10),
+    API_TIMEOUT: parseInt(minutesProps.API_TIMEOUT || '300', 10)
 };
 
 // ==========================================
@@ -38,38 +33,70 @@ const MINUTES_PROMPTS = {
     MINUTES: `
 以下の会議の書き起こしテキストから、指定のフォーマットで議事録を作成してください。
 
-【重要ルール】
-- **冒頭の挨拶（「承知しました」「以下に作成します」等）は一切不要です。**
-- 指定された出力フォーマットの中身だけを出力してください。
-- 余計な前置きや後書きは書かないでください。
+# 全体目標
+**今期目標：営業利益の最大化**
+※すべての内容は、この目標達成にどう寄与するかという視点で整理してください。
 
-【出力フォーマット】
-## 議事録：[会議名称]
+# 議事録の構成・出力ルール（厳守）
 
-### 1. 開催概要
-* **日時：** 202X年MM月DD日（曜） HH:mm 〜 HH:mm (推定)
-* **出席者：** テキストから推定される人物
+## 1. 書式とレイアウト（Googleドキュメント用最適化）
+Googleドキュメントへ「書式なしテキスト」として貼り付けた際に、手直し不要で美しく見えるよう、以下の記号と改行ルールを絶対に守ってください。
 
-### 2. 本日の目的
-* [会議の主な目的を1〜2行で]
+*   **Markdown禁止**：# ## ** __ などのMarkdown記号は一切使用しないこと。
+*   **見出し記号の統一**：
+    *   大見出し（セクション）： ■ （全角四角＋半角スペース）
+    *   中見出し（トピック）： 　● （全角スペース＋全角丸＋半角スペース）
+    *   小見出し・詳細： 　　・ （全角スペース2つ＋全角中黒＋半角スペース）
+*   **改行・余白のルール**：
+    *   ■（大見出し）の前は、必ず「2行」の空行を入れる。
+    *   ●（中見出し）の前は、必ず「1行」の空行を入れる。
+    *   セクション内の文章は適度に改行し、詰まりすぎないようにする。
 
-### 3. 決定事項
-> **【決定】** [決定した内容1]
-> **【決定】** [決定した内容2]
+## 2. 記述ルール
+*   個人名は記載しない（役割・部署名・「担当者」と記載）。
+*   文体は「です・ます」調ではなく、簡潔な「である」調、または体言止めとする。
 
-### 4. 協議内容（要旨）
-#### [議題1]
-* [内容]
-#### [議題2]
-* [内容]
+## 3. 記事構成（階層構造）
+以下のセクション順序で出力すること。
 
-### 5. ネクストアクション（ToDo）
-| 期限 | タスク内容 | 担当者 |
-| --- | --- | --- |
-| MM/DD | [タスク1] | [氏名] |
+(1) 議事録_[ファイル名の日付_連番]（例: 議事録_260202_01）（1行目にタイトルとして記載。入力テキストのファイル名情報から抽出）
 
-### 6. 次回予定
-* [次回の日程や議題など]
+(2) ■ 基本情報
+　● 日時
+　　・ [入力テキストから推定される日時]
+　● 議題
+　　・ [会議の主な議題]
+　● 参加部署
+　　・ [推測可能な範囲で記述]
+
+(3) ■ 議論詳細（※ここがメイン）
+　● [テーマごとの見出し]
+　　・ [詳細内容]
+　　・ [具体的なアクション（誰が、いつ、何を、いくらで）]
+　　・ [必須数値：価格、数量、原価率、期間などの数字は必ず記載。「数値言及なし」の場合はその旨明記]
+
+(4) ■ 【決定事項】
+　● [決定事項1]
+　　・ 詳細は簡潔に記述
+　● [決定事項2]
+　　・ 詳細は簡潔に記述
+　※重要。目立つように【決定】と隅付き括弧で強調する（Markdownの太字は使わない）。
+
+(5) ■ 懸念・リスク事項
+　● 営業利益目標への阻害要因
+　　・ [具体的な懸念点]
+
+(6) ■ ネクストアクション
+　　・ [期限] [担当] : [内容]
+　　・ [期限] [担当] : [内容]
+　※表形式は使わず、箇条書きで記載する。
+
+(7) ■ 会議の総括評価（AI視点）
+　・ この会議が今期の「営業利益」にどう貢献するか、または何が不足していたかを客観的に評価。
+
+# 出力開始
+余計な挨拶や前置きは一切不要です。
+1行目のタイトル「議事録_YYMMDD_XX」から出力してください。
 `,
 
     PROPOSAL: `
@@ -125,9 +152,68 @@ const MINUTES_PROMPTS = {
 // ==========================================
 // Webアプリケーション (doPost) - 外部からの実行用
 // ==========================================
+// ==========================================
+// Webアプリケーション (doPost) - 外部からの実行用
+// ==========================================
 function doPost(e) {
     try {
-        Logger.log("🌐 Webアプリ経由のリクエストを受信しました");
+        const postData = JSON.parse(e.postData.contents);
+        const action = postData.action;
+
+        // 📥 音声アップロード処理 (action: 'upload_chunk')
+        if (action === 'upload_chunk') {
+            const fileName = postData.fileName;
+            const fileData = postData.fileData; // Base64 string
+
+            if (!fileName || !fileData) {
+                throw new Error('Missing fileName or fileData');
+            }
+
+            const folder = DriveApp.getFolderById(MINUTES_CONFIG.VOICE_FOLDER_ID);
+            const decodedData = Utilities.base64Decode(fileData);
+            const blob = Utilities.newBlob(decodedData, 'audio/webm', fileName);
+
+            const file = folder.createFile(blob);
+            Logger.log(`✅ ファイル保存完了: ${fileName} (${file.getId()})`);
+
+            return ContentService.createTextOutput(JSON.stringify({
+                status: 'success',
+                message: 'Upload successful',
+                fileId: file.getId()
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
+
+        // 📑 報告書生成リクエスト (action: 'create_report') または その他
+        Logger.log("🌐 Webアプリ経由のリクエストを受信しました（非同期モード）");
+
+        // 一回限りのトリガーを作成して即座に終了する
+        ScriptApp.newTrigger('executeAsyncTasks')
+            .timeBased()
+            .after(1) // 1ミリ秒後（実質即時）
+            .create();
+
+        // 待たせずにレスポンスを返す
+        return ContentService.createTextOutput(JSON.stringify({
+            status: 'success',
+            message: 'Request accepted. Processing started in background.'
+        })).setMimeType(ContentService.MimeType.JSON);
+
+    } catch (error) {
+        Logger.log(`❌ Webアプリ受付エラー: ${error.toString()}`);
+        return ContentService.createTextOutput(JSON.stringify({
+            status: 'error',
+            message: error.toString()
+        })).setMimeType(ContentService.MimeType.JSON);
+    }
+}
+
+/**
+ * 非同期実行用のラッパー関数
+ * doPostからトリガー経由で呼び出される
+ */
+function executeAsyncTasks() {
+    try {
+        Logger.log("🚀 バックグラウンド処理を開始します");
 
         // 1. 音声ファイルの文字起こし実行 (transcription.jsの関数)
         if (typeof processVoiceFiles === 'function') {
@@ -141,18 +227,11 @@ function doPost(e) {
         Logger.log("▶ processDocuments(true) を実行します");
         processDocuments(true);
 
-        // レスポンス作成
-        return ContentService.createTextOutput(JSON.stringify({
-            status: 'success',
-            message: 'Transcription and Report generation sequence started.'
-        })).setMimeType(ContentService.MimeType.JSON);
+        Logger.log("✅ バックグラウンド処理が完了しました");
 
     } catch (error) {
-        Logger.log(`❌ Webアプリ実行エラー: ${error.toString()}`);
-        return ContentService.createTextOutput(JSON.stringify({
-            status: 'error',
-            message: error.toString()
-        })).setMimeType(ContentService.MimeType.JSON);
+        Logger.log(`❌ バックグラウンド実行エラー: ${error.toString()}`);
+        Logger.log(error.stack);
     }
 }
 
@@ -167,12 +246,13 @@ function manualRun() {
 // メイン処理（トリガー実行）
 // force = true の場合は待機時間を無視
 // ==========================================
-async function processDocuments(force = false) {
+function processDocuments(force = false) {
     try {
         Logger.log(`=== 書類生成処理を開始 (Force: ${force}) ===`);
 
         const txtFolder = DriveApp.getFolderById(MINUTES_CONFIG.TXT_FOLDER_ID);
         const docFolder = DriveApp.getFolderById(MINUTES_CONFIG.DOC_FOLDER_ID);
+        const archFolder = DriveApp.getFolderById(MINUTES_CONFIG.ARCH_FOLDER_ID);
         const files = txtFolder.getFilesByType(MimeType.PLAIN_TEXT);
 
         let processedCount = 0;
@@ -203,7 +283,15 @@ async function processDocuments(force = false) {
             // 既に議事録があるかチェック
             const minutesName = `【議事録】${baseName}`;
             if (docFolder.getFilesByName(minutesName).hasNext()) {
-                continue; // 作成済みならスキップ
+                Logger.log(`⚠️ 既作成済みスキップ: ${minutesName}`);
+                // 既に作成済みなら、元ファイルはアーカイブへ移動（整理のため）
+                try {
+                    file.moveTo(archFolder);
+                    Logger.log(`📦 (既済) アーカイブ移動完了: ${fileName}`);
+                } catch (e) {
+                    Logger.log(`⚠️ (既済) アーカイブ移動失敗: ${e.message}`);
+                }
+                continue;
             }
 
             Logger.log(`📄 書類生成ターゲット検出: ${fileName}`);
@@ -212,7 +300,7 @@ async function processDocuments(force = false) {
             let createdFiles = [];
 
             // 1. 議事録作成
-            const minutesContent = await callGeminiForMinutes(textContent, MINUTES_PROMPTS.MINUTES);
+            const minutesContent = callGeminiForMinutes(textContent, MINUTES_PROMPTS.MINUTES);
             if (minutesContent) {
                 const docFile = createMinutesDoc(docFolder, minutesName, minutesContent);
                 createdFiles.push(docFile);
@@ -222,7 +310,7 @@ async function processDocuments(force = false) {
             // 2. 企画書作成
             const proposalName = `【企画書】${baseName}`;
             if (!docFolder.getFilesByName(proposalName).hasNext()) {
-                const proposalContent = await callGeminiForMinutes(textContent, MINUTES_PROMPTS.PROPOSAL);
+                const proposalContent = callGeminiForMinutes(textContent, MINUTES_PROMPTS.PROPOSAL);
                 if (proposalContent) {
                     const imageBlob = findSampleImage();
                     const docFile = createMinutesDoc(docFolder, proposalName, proposalContent, imageBlob);
@@ -234,6 +322,14 @@ async function processDocuments(force = false) {
             // 3. メール送信
             if (createdFiles.length > 0) {
                 sendNotificationEmail(baseName, createdFiles, minutesContent);
+
+                // 4. 元ファイルをアーカイブへ移動（成功時のみ）
+                try {
+                    file.moveTo(archFolder);
+                    Logger.log(`📦 アーカイブ移動完了: ${fileName}`);
+                } catch (e) {
+                    Logger.log(`⚠️ アーカイブ移動失敗: ${e.message}`);
+                }
             }
 
             processedCount++;
@@ -340,7 +436,7 @@ function findSampleImage() {
 // ==========================================
 // Gemini API 呼び出し
 // ==========================================
-async function callGeminiForMinutes(text, systemPrompt) {
+function callGeminiForMinutes(text, systemPrompt) {
     let previousModel = null;
 
     for (let attempt = 1; attempt <= MINUTES_CONFIG.MAX_RETRIES; attempt++) {

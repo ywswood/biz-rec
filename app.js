@@ -6,12 +6,8 @@
 // 設定
 // ==========================================
 const CONFIG = {
-  CLIENT_ID: '1063787713722-6tlecpqtmp5i2uubvmcvrgcq5islr4i0.apps.googleusercontent.com',
-  SCOPES: 'https://www.googleapis.com/auth/drive.file',
-  DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-
-  // Google Drive フォルダID
-  VOICE_FOLDER_ID: '1Drp4_rkJsLpdC49tzRDACcCnQb_ywl4h', // voice フォルダ
+  // Google Drive フォルダID (クライアント側では使用せず、GAS側で管理)
+  // VOICE_FOLDER_ID: '1Drp4_rkJsLpdC49tzRDACcCnQb_ywl4h', 
 
   // 録音設定
   CHUNK_DURATION: 5 * 60 * 1000, // 5分（ミリ秒）
@@ -30,7 +26,6 @@ const CONFIG = {
 // ==========================================
 // グローバル変数
 // ==========================================
-let accessToken = null;
 let mediaRecorder = null;
 let audioStream = null;
 let recordingStartTime = null;
@@ -42,28 +37,22 @@ let uploadedChunks = 0;
 let sessionId = null;
 
 // DOM要素
-const authSection = document.getElementById('authSection');
 const mainSection = document.getElementById('mainSection');
-const authButton = document.getElementById('authButton');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
-const statusText = document.getElementById('statusText');
-const chunkCount = document.getElementById('chunkCount');
-const uploadCount = document.getElementById('uploadCount');
 const timer = document.getElementById('timer');
 const progressBar = document.getElementById('progressBar');
 const logBox = document.getElementById('logBox');
-const chunkList = document.getElementById('chunkList');
 
-// ==========================================
-// 初期化
-// ==========================================
 // ==========================================
 // 初期化
 // ==========================================
 window.onload = () => {
   log('アプリ起動');
-  authButton.addEventListener('click', handleAuth);
+
+  // 認証なしで即座にアプリを表示
+  mainSection.classList.remove('hidden');
+
   startBtn.addEventListener('click', () => startRecording(false)); // 新規録音
 
   const continueBtn = document.getElementById('continueBtn');
@@ -105,37 +94,21 @@ function checkPreviousSession() {
 }
 
 // ==========================================
-// 認証処理
-// ==========================================
-function handleAuth() {
-  log('Google認証を開始...');
-
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.CLIENT_ID,
-    scope: CONFIG.SCOPES,
-    callback: (response) => {
-      if (response.error) {
-        log(`❌ 認証エラー: ${response.error}`, 'error');
-        return;
-      }
-
-      accessToken = response.access_token;
-      log('✅ 認証成功');
-
-      // UIを切り替え
-      authSection.classList.add('hidden');
-      mainSection.classList.remove('hidden');
-    },
-  });
-
-  client.requestAccessToken();
-}
-
-// ==========================================
 // 録音開始 (isContinue: 続きからかどうか)
 // ==========================================
 async function startRecording(isContinue = false) {
   try {
+    // ⚡️ 即座にボタンを無効化してダブルクリック防止＆「反応中」を示す
+    const btn = isContinue ? document.getElementById('continueBtn') : startBtn;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ 準備中...';
+
+    // 続きからボタンも無効化（誤操作防止）
+    const continueBtn = document.getElementById('continueBtn');
+    if (continueBtn) continueBtn.disabled = true;
+    startBtn.disabled = true;
+
     log(isContinue ? '録音を再開します...' : '録音を開始します...');
 
     // マイク権限を取得
@@ -193,11 +166,15 @@ async function startRecording(isContinue = false) {
 
     mediaRecorder.start();
 
-    // UIを更新
+    // UIを更新 (ここでStopボタンに切り替え)
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
-    statusText.innerHTML = '<span class="recording-indicator"></span>録音中';
-    chunkList.style.display = 'block';
+
+    // ボタンの状態をリセット（次に表示されるときのために）
+    btn.disabled = false;
+    btn.textContent = originalText;
+    if (continueBtn) continueBtn.disabled = false;
+    startBtn.disabled = false;
 
     // タイマー開始
     startTimer();
@@ -209,6 +186,16 @@ async function startRecording(isContinue = false) {
 
   } catch (error) {
     log(`❌ 録音開始エラー: ${error.message}`, 'error');
+    alert('マイクの起動に失敗しました: ' + error.message);
+
+    // エラー時の復帰
+    startBtn.disabled = false;
+    startBtn.textContent = '録音開始';
+    const continueBtn = document.getElementById('continueBtn');
+    if (continueBtn) {
+      continueBtn.disabled = false;
+      continueBtn.textContent = '⏯️ 続きから録音';
+    }
   }
 }
 
@@ -278,22 +265,16 @@ async function processChunk() {
 
   log(`📤 アップロード中: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
-  // チャンクリストに追加
-  addChunkToList(fileName, 'アップロード中...');
-
   try {
-    await uploadToDrive(blob, fileName);
+    await uploadToGAS(blob, fileName);
 
     uploadedChunks++;
-    updateChunkInList(fileName, 'uploaded');
 
     log(`✅ アップロード完了: ${fileName}`);
-    updateUI();
     updateSessionChunk(); // 次回のために保存
 
   } catch (error) {
     log(`❌ アップロード失敗: ${error.message}`, 'error');
-    updateChunkInList(fileName, '失敗');
 
     // 自動ダウンロード（救済措置）
     log(`💾 自動保存を実行します: ${fileName}`);
@@ -322,7 +303,7 @@ async function handleManualUpload(e) {
 
   try {
     // FileオブジェクトはBlobの一種なのでそのまま渡せる
-    await uploadToDrive(file, file.name);
+    await uploadToGAS(file, file.name);
     log(`✅ 手動アップロード成功: ${file.name}`);
     alert(`アップロード成功: ${file.name}`);
   } catch (error) {
@@ -392,36 +373,38 @@ function downloadChunk(blob, fileName) {
   }, 100);
 }
 // ==========================================
-// Google Drive アップロード（マルチパート）
+// GAS Web App へアップロード (認証不要)
 // ==========================================
-async function uploadToDrive(blob, fileName) {
-  const metadata = {
-    name: fileName,
-    mimeType: CONFIG.MIME_TYPE,
-    parents: [CONFIG.VOICE_FOLDER_ID]
-  };
+async function uploadToGAS(blob, fileName) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = async () => {
+      try {
+        const base64Data = reader.result.split(',')[1];
 
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', blob);
+        const response = await fetch(CONFIG.REPORT_API_URL, {
+          method: 'POST',
+          mode: 'no-cors', // クロスオリジン許可（レスポンスは見れないが送信は可能）
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'upload_chunk',
+            fileName: fileName,
+            fileData: base64Data
+          })
+        });
 
-  const response = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: form
-    }
-  );
+        // no-corsなのでレスポンスの中身は確認できないが、エラーが出なければ成功とみなす
+        resolve({ status: 'sent' });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'アップロード失敗');
-  }
-
-  return await response.json();
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = (e) => reject(e);
+  });
 }
 
 // ==========================================
@@ -440,37 +423,6 @@ function startTimer() {
     progressBar.style.width = `${progress}%`;
 
   }, 100);
-}
-
-// ==========================================
-// UI更新
-// ==========================================
-function updateUI() {
-  chunkCount.textContent = `${currentChunk} / ${CONFIG.MAX_CHUNKS}`;
-  uploadCount.textContent = `${uploadedChunks} 完了`;
-}
-
-// ==========================================
-// チャンクリスト管理
-// ==========================================
-function addChunkToList(fileName, status) {
-  const item = document.createElement('div');
-  item.className = 'chunk-item';
-  item.id = `chunk-${fileName}`;
-  item.innerHTML = `
-    <span>${fileName}</span>
-    <span class="chunk-status">${status}</span>
-  `;
-  chunkList.appendChild(item);
-}
-
-function updateChunkInList(fileName, status) {
-  const item = document.getElementById(`chunk-${fileName}`);
-  if (item) {
-    const statusSpan = item.querySelector('.chunk-status');
-    statusSpan.className = `chunk-status ${status}`;
-    statusSpan.textContent = status === 'uploaded' ? '完了' : status;
-  }
 }
 
 // ==========================================
@@ -506,8 +458,6 @@ function cleanup() {
   // 続きボタンを表示
   const continueBtn = document.getElementById('continueBtn');
   if (continueBtn) continueBtn.style.display = 'inline-block';
-
-  statusText.textContent = '完了';
 
   log('🛑 録音停止・リソース解放完了');
 }
