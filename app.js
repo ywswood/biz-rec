@@ -342,9 +342,7 @@ async function handleCreateReport() {
     await fetch(CONFIG.REPORT_API_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      // no-corsモードではカスタムヘッダー（Content-Type等）を送ると不具合が出ることがあるため削除
       body: JSON.stringify({ action: 'create_report' })
     });
 
@@ -389,10 +387,7 @@ async function uploadToGAS(blob, fileName) {
 
         const response = await fetch(CONFIG.REPORT_API_URL, {
           method: 'POST',
-          mode: 'no-cors', // クロスオリジン許可（レスポンスは見れないが送信は可能）
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          mode: 'no-cors', // クロスオリジン許可
           body: JSON.stringify({
             action: 'upload_chunk',
             fileName: fileName,
