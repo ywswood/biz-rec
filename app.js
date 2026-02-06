@@ -48,7 +48,7 @@ const logBox = document.getElementById('logBox');
 // 初期化
 // ==========================================
 window.onload = () => {
-  log('アプリ起動');
+  log('GigiRock 起動');
 
   // 認証なしで即座にアプリを表示
   mainSection.classList.remove('hidden');

@@ -25,8 +25,8 @@
 
     body {
       font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      /* Deep Blue Gradient */
-      background: linear-gradient(135deg, #004CA0 0%, #002D62 100%);
+      /* Rock Black Background */
+      background: #000000;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -38,161 +38,156 @@
     .container {
       background: #FFFFFF;
       border-radius: 30px;
-      padding: 40px 30px;
+      padding: 50px 30px 40px;
       max-width: 500px;
       width: 100%;
-      box-shadow: 0 10px 40px rgba(0, 76, 160, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 20px 60px rgba(255, 0, 0, 0.2);
+      border: 4px solid #e60012;
+      /* Rock Red Border */
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo-top-left {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+    }
+
+    .logo-top-left img {
+      height: 100%;
+      object-fit: contain;
     }
 
     h1 {
-      font-size: 28px;
+      font-size: 48px;
       text-align: center;
-      margin-bottom: 10px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #004CA0;
-      /* Main Blue */
+      margin-bottom: 40px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      color: #000;
+      font-style: italic;
+      text-transform: uppercase;
+      font-family: 'Arial Black', Gadget, sans-serif;
     }
 
-    .subtitle {
-      text-align: center;
-      font-size: 14px;
-      opacity: 0.8;
-      margin-bottom: 40px;
-      font-weight: 400;
-      color: #004CA0;
+    h1 span {
+      color: #e60012;
+      /* Subtle highlight */
     }
 
     .timer {
-      font-size: 52px;
+      font-size: 64px;
       font-weight: 700;
       text-align: center;
-      margin: 20px 0;
+      margin: 10px 0;
       font-variant-numeric: tabular-nums;
-      text-shadow: none;
-      color: #004CA0;
+      color: #000;
+      letter-spacing: -0.05em;
     }
 
     .progress-bar {
       width: 100%;
-      height: 10px;
-      background: rgba(0, 76, 160, 0.1);
-      border-radius: 10px;
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
       overflow: hidden;
-      margin-top: 15px;
+      margin: 10px 0 30px;
     }
 
     .progress-fill {
       height: 100%;
-      background: #004CA0;
+      background: #e60012;
       transition: width 0.3s ease;
-      border-radius: 10px;
     }
 
     .btn {
       width: 100%;
-      padding: 18px;
+      padding: 20px;
       border: none;
-      border-radius: 15px;
-      font-size: 18px;
-      font-weight: 700;
+      border-radius: 12px;
+      font-size: 20px;
+      font-weight: 900;
       cursor: pointer;
-      transition: all 0.2s ease;
-      margin-bottom: 15px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      margin-bottom: 20px;
+      text-transform: uppercase;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #004CA0, #003380);
+      background: #e60012;
       color: #fff;
+      box-shadow: 0 6px 0 #900;
     }
 
     .btn-primary:active {
-      transform: scale(0.98);
-      background: #003380;
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 #900;
     }
 
     .btn-danger {
-      background: #444;
+      background: #000;
       color: #fff;
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      box-shadow: 0 6px 0 #333;
     }
 
     .btn-danger:active {
-      transform: scale(0.98);
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 #333;
     }
 
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    /* Sub/Accent Button (Gold) */
     .btn-gold {
-      background: linear-gradient(135deg, #C9A333, #B89020);
+      background: #333;
       color: #fff;
+      box-shadow: 0 6px 0 #000;
+    }
+
+    .btn-gold:active {
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 #000;
     }
 
     .log-box {
-      background: rgba(0, 0, 0, 0.05);
-      /* Light grey for visibility on white */
+      background: #f8f8f8;
       border-radius: 15px;
       padding: 15px;
-      max-height: 200px;
+      max-height: 150px;
       overflow-y: auto;
       font-size: 12px;
       font-family: 'Courier New', monospace;
-      margin-top: 30px;
-      color: #444;
-    }
-
-    .log-entry {
-      margin-bottom: 5px;
-      opacity: 0.9;
+      margin-top: 20px;
+      border-left: 5px solid #e60012;
     }
 
     .log-time {
-      color: #004CA0;
+      color: #e60012;
       font-weight: bold;
       margin-right: 8px;
     }
 
-    .recording-indicator {
-      width: 16px;
-      height: 16px;
-      background: #C9A333;
-      /* Gold accent */
-      border-radius: 50%;
-      display: inline-block;
-      animation: pulse 1.5s ease-in-out infinite;
-      margin-right: 8px;
-    }
-
     .hidden {
-      display: none;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.3;
-      }
+      display: none !important;
     }
   </style>
 </head>
 
 <body>
   <div class="container">
+    <!-- ロゴ配置 -->
+    <div class="logo-top-left">
+      <!-- 修正: 画像パスをlogo.pngとし、CSSでスタイリング -->
+      <div style="background: black; padding: 2px 8px; display: flex; align-items: center; border: 1px solid white;">
+        <span style="color: #e60012; font-weight: 900; font-size: 20px; margin-right: 4px;">W</span>
+        <span style="color: white; font-weight: 700; font-size: 10px; letter-spacing: 1px;">WOOD STOCK</span>
+      </div>
+    </div>
+
     <!-- メインセクション -->
     <div id="mainSection">
-      <h1>🎤 商談録音</h1>
-      <p class="subtitle">自動文字起こし対応</p>
+      <h1>GigiR<span>o</span>ck</h1>
 
       <!-- タイマー -->
       <div class="timer" id="timer">00:00</div>
@@ -203,7 +198,7 @@
       </div>
 
       <!-- コントロールボタン -->
-      <div style="margin-top: 40px;">
+      <div style="margin-top: 20px;">
         <button id="startBtn" class="btn btn-primary">
           録音開始
         </button>
@@ -211,26 +206,21 @@
           録音停止
         </button>
         <button id="continueBtn" class="btn btn-gold" style="display: none;">
-          ⏯️ 続きから録音
+          続きから録音
         </button>
       </div>
 
       <!-- 報告書作成ボタンエリア -->
-      <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 30px;">
-        <button id="createReportBtn" class="btn"
-          style="background: linear-gradient(135deg, #004CA0, #003380); color: white;">
-          📑 報告書を作成して送信
+      <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 30px;">
+        <button id="createReportBtn" class="btn" style="background: #000; color: white; box-shadow: 0 6px 0 #e60012;">
+          報告書を作成して送信
         </button>
-        <p style="font-size: 11px; text-align: center; opacity: 0.6; margin-top: -10px;">
-          ※アップロード完了後に押してください
-        </p>
       </div>
 
       <!-- 手動アップロード -->
-      <div style="margin-top: 20px; text-align: center;">
-        <p style="font-size: 12px; margin-bottom: 10px; color: #888;">救済・手動アップロード</p>
+      <div style="margin-top: 10px; text-align: center;">
         <button id="manualUploadBtn" class="btn"
-          style="background: #f0f0f0; color: #666; font-size: 14px; padding: 12px; box-shadow: none; border: 1px solid #ddd;">
+          style="background: transparent; color: #999; font-size: 13px; padding: 10px; box-shadow: none; border: 1px solid #eee; font-weight: 400; text-transform: none;">
           📁 ファイルを選択
         </button>
         <input type="file" id="manualFileInput" accept=".webm" style="display: none">
