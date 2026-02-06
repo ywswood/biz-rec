@@ -82,7 +82,7 @@ window.onload = () => {
 };
 
 function checkPreviousSession() {
-  const lastSession = localStorage.getItem('biz_record_session');
+  const lastSession = localStorage.getItem('biz_rec_session');
   if (lastSession) {
     const continueBtn = document.getElementById('continueBtn');
     if (continueBtn) continueBtn.style.display = 'inline-block';
@@ -130,7 +130,7 @@ async function startRecording(isContinue = false) {
 
     if (isContinue) {
       // 続きから: localStorageから復元
-      const savedData = JSON.parse(localStorage.getItem('biz_record_session'));
+      const savedData = JSON.parse(localStorage.getItem('biz_rec_session'));
       sessionId = savedData.id;
       currentChunk = savedData.currentChunk; // 次のチャンク番号
       uploadedChunks = 0; // 表示用カウンタはリセットしても良いが、続き番号は重要
@@ -473,7 +473,7 @@ function saveSessionInfo() {
     currentChunk: currentChunk + 1, // 次の開始番号
     updatedAt: Date.now()
   };
-  localStorage.setItem('biz_record_session', JSON.stringify(data));
+  localStorage.setItem('biz_rec_session', JSON.stringify(data));
 }
 
 // チャンク確定時に次回番号を更新
@@ -483,7 +483,7 @@ function updateSessionChunk() {
     currentChunk: currentChunk + 1, // 現在の処理が終わったら次は+1
     updatedAt: Date.now()
   };
-  localStorage.setItem('biz_record_session', JSON.stringify(data));
+  localStorage.setItem('biz_rec_session', JSON.stringify(data));
 }
 
 

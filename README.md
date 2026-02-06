@@ -13,7 +13,7 @@
 
 ### 1. Google Cloud Platform設定（完了済み）
 
-✅ プロジェクト作成: `biz-record`
+✅ プロジェクト作成: `biz-rec`
 ✅ Google Drive API有効化
 ✅ OAuth 2.0認証情報作成
 ✅ クライアントID取得
@@ -24,7 +24,7 @@
 
 ```
 マイドライブ/
-└── biz-record/
+└── biz-rec/
     ├── voice/  (ID: 1Drp4_rkJsLpdC49tzRDACcCnQb_ywl4h)
     └── txt/    (ID: 11gbAyd8kdgZN8bD29PDAm32B0LuboVtq)
 ```
@@ -36,7 +36,7 @@
 以下のファイルを同じディレクトリに配置してください：
 
 ```
-biz-record/
+biz-rec/
 ├── index.html      ← メイン画面
 ├── app.js          ← 録音・アップロード処理
 └── manifest.json   ← PWA設定
@@ -79,7 +79,7 @@ npx http-server -p 8080
 const CONFIG = {
   BANK_URL: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec', // ← ここを変更
   BANK_PASS: '1030013',
-  PROJECT_NAME: 'biz-record',
+  PROJECT_NAME: 'biz-rec',
   // ...
 };
 ```
@@ -173,7 +173,7 @@ const CONFIG = {
 
 ### 文字起こし確認
 
-1. Google Driveの `biz-record/doc/` フォルダを開く
+1. Google Driveの `biz-rec/doc/` フォルダを開く
 2. `YYMMDD_01.txt` 形式のファイルが作成されています
    - 例: `260201_01.txt` (2026年2月1日の1件目)
 3. ファイルを開いて文字起こし結果を確認

@@ -12,7 +12,7 @@ const transcribeProps = PropertiesService.getScriptProperties().getProperties();
 const CONFIG = {
   BANK_URL: transcribeProps.BANK_URL,
   BANK_PASS: transcribeProps.BANK_PASS,
-  PROJECT_NAME: transcribeProps.PROJECT_NAME || 'biz-record',
+  PROJECT_NAME: transcribeProps.PROJECT_NAME || 'biz-rec',
   TXT_FOLDER_ID: transcribeProps.TXT_FOLDER_ID,
   ARCH_FOLDER_ID: transcribeProps.ARCH_FOLDER_ID,
   VOICE_FOLDER_ID: transcribeProps.VOICE_FOLDER_ID,

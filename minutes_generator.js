@@ -14,7 +14,7 @@ const minutesProps = PropertiesService.getScriptProperties().getProperties();
 const MINUTES_CONFIG = {
     BANK_URL: minutesProps.BANK_URL,
     BANK_PASS: minutesProps.BANK_PASS,
-    PROJECT_NAME: minutesProps.PROJECT_NAME || 'biz-record',
+    PROJECT_NAME: minutesProps.PROJECT_NAME || 'biz-rec',
     TXT_FOLDER_ID: minutesProps.TXT_FOLDER_ID,
     DOC_FOLDER_ID: minutesProps.DOC_FOLDER_ID,
     ARCH_FOLDER_ID: minutesProps.ARCH_FOLDER_ID,
@@ -403,7 +403,7 @@ function sendNotificationEmail(baseName, files, minutesContent = null) {
     }
 
     body += `\n以上のファイルをPDFとして添付しました。ご確認ください。\n`;
-    body += `\n--\nBiz-Record Bot`;
+    body += `\n--\nBiz-Rec Bot`;
 
     MailApp.sendEmail({
         to: MINUTES_CONFIG.NOTIFICATION_EMAIL,
