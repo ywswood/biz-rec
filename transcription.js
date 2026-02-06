@@ -15,6 +15,7 @@ const CONFIG = {
     PROJECT_NAME: transcribeProps.PROJECT_NAME || 'biz-rec',
     TXT_FOLDER_ID: transcribeProps.TXT_FOLDER_ID,
     VOICE_FOLDER_ID: transcribeProps.VOICE_FOLDER_ID,
+    ARCH_FOLDER_ID: transcribeProps.ARCH_FOLDER_ID, // 追加
     MAX_RETRIES: 3,
     RETRY_DELAY: 2000,
     API_TIMEOUT: 60000,
@@ -26,40 +27,48 @@ const CONFIG = {
 // ==========================================
 function processVoiceFiles() {
     const voiceFolder = DriveApp.getFolderById(CONFIG.VOICE_FOLDER_ID);
+    const fileEntries = [];
     const files = voiceFolder.getFiles();
 
-    Logger.log('=== 処理開始: 音声ファイルスキャン ===');
-    let count = 0;
-
+    // 1. ファイルを一旦リスト化して名前（時刻順）でソート
     while (files.hasNext()) {
         const file = files.next();
+        if (file.getName().endsWith('.webm')) {
+            fileEntries.push(file);
+        }
+    }
+
+    // 昇順ソート（古い録音から順に処理）
+    fileEntries.sort((a, b) => a.getName().localeCompare(b.getName()));
+
+    Logger.log(`=== 処理開始: 音声ファイルスキャン (${fileEntries.length}件) ===`);
+    let count = 0;
+
+    for (const file of fileEntries) {
         const fileName = file.getName();
+        try {
+            Logger.log(`🎤 処理開始: ${fileName}`);
 
-        if (fileName.endsWith('.webm')) {
-            try {
-                Logger.log(`🎤 処理開始: ${fileName}`);
+            // 文字起こし実行
+            const text = transcribeAudio(file);
 
-                // 文字起こし実行
-                const text = transcribeAudio(file);
-
-                // 有意性判定
-                if (!text || text.includes('SKIP') || text.length < CONFIG.MIN_TEXT_LENGTH) {
-                    Logger.log(`⚠️ 有意な内容なしと判定し破棄します: "${text || '(空文字)'}"`);
-                    file.setTrashed(true);
-                    continue;
-                }
-
-                // テキスト保存（排他制御・高速検索・インデックス遅延対策）
-                saveTextToSessionFile(fileName, text);
-
-                // 処理済み音声ファイルは即時削除（アーカイブフォルダは存在しない前提）
+            // 有意性判定
+            if (!text || text.includes('SKIP') || text.length < CONFIG.MIN_TEXT_LENGTH) {
+                Logger.log(`⚠️ 有意な内容なしと判定し破棄します: "${text || '(空文字)'}"`);
                 file.setTrashed(true);
-                Logger.log(`🗑️ 元音声ファイル削除: ${fileName}`);
-
-                count++;
-            } catch (e) {
-                Logger.log(`❌ エラー (${fileName}): ${e.message}`);
+                continue;
             }
+
+            // テキスト保存（排他制御・高速検索・インデックス遅延対策）
+            saveTextToSessionFile(fileName, text);
+
+            // 処理済み音声ファイルは即時削除
+            file.setTrashed(true);
+            Logger.log(`🗑️ 元音声ファイル削除: ${fileName}`);
+
+            count++;
+        } catch (e) {
+            Logger.log(`❌ エラー (${fileName}): ${e.message}`);
         }
     }
 
@@ -169,17 +178,20 @@ function saveTextToSessionFile(originalFileName, text) {
         const chunkNum = chunkMatch ? chunkMatch[1] : '00';
         const appendContent = `\n\n--- Chunk ${chunkNum} (${new Date().toLocaleTimeString()}) ---\n${text}`;
 
-        // 2. 既存セッションファイルの検索（Descriptionメタデータを利用）
+        // 2. 既存セッションファイルの検索
         let targetFile = null;
-        const existingFiles = txtFolder.searchFiles(`description = '${sessionId}' and mimeType = 'text/plain' and trashed = false`);
+        const allFiles = txtFolder.getFiles();
 
-        if (existingFiles.hasNext()) {
-            targetFile = existingFiles.next();
-        } else {
-            // インデックス反映遅延対策
-            const recentFiles = txtFolder.searchFiles(`name contains '${dateStr}_' and mimeType = 'text/plain' and trashed = false`);
-            while (recentFiles.hasNext()) {
-                const f = recentFiles.next();
+        while (allFiles.hasNext()) {
+            const f = allFiles.next();
+            // 名前でまず絞り込み
+            if (f.getName().indexOf(dateStr + "_") !== -1 && !f.isTrashed()) {
+                // メタデータのSessionIDをチェック
+                if (f.getDescription() === sessionId) {
+                    targetFile = f;
+                    break;
+                }
+                // インデックス遅延対策：中身に含まれるIDをチェック
                 if (new Date().getTime() - f.getLastUpdated().getTime() < 60000) {
                     const content = f.getBlob().getDataAsString();
                     if (content.indexOf(`Original Session: ${sessionId}`) !== -1) {
@@ -197,17 +209,31 @@ function saveTextToSessionFile(originalFileName, text) {
             targetFile.setContent(currentContent + appendContent);
             Logger.log(`📝 既存ファイル(${targetFile.getName()})に追記: ${sessionId}`);
         } else {
-            // 新規作成
+            // 新規作成: txtフォルダとarchフォルダの両方をスキャンして最大連番を特定
             let maxNum = 0;
-            const allFilesForDay = txtFolder.searchFiles(`name contains '${dateStr}_' and mimeType = 'text/plain' and trashed = false`);
-            while (allFilesForDay.hasNext()) {
-                const f = allFilesForDay.next();
-                const m = f.getName().match(/_(\d{2})\.txt$/);
-                if (m) {
-                    const n = parseInt(m[1], 10);
-                    if (n > maxNum) maxNum = n;
+            const foldersToScan = [CONFIG.TXT_FOLDER_ID, CONFIG.ARCH_FOLDER_ID];
+
+            foldersToScan.forEach(folderId => {
+                if (!folderId || folderId.trim() === "") return;
+                try {
+                    const folder = DriveApp.getFolderById(folderId);
+                    const allFiles = folder.getFiles();
+                    while (allFiles.hasNext()) {
+                        const f = allFiles.next();
+                        const fName = f.getName();
+                        // 日付が一致するテキストファイル
+                        if (fName.indexOf(dateStr + "_") === 0 && fName.endsWith(".txt") && !f.isTrashed()) {
+                            const m = fName.match(/_(\d{2})\.txt$/);
+                            if (m) {
+                                const n = parseInt(m[1], 10);
+                                if (n > maxNum) maxNum = n;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    Logger.log(`⚠️ フォルダスキャン失敗 (${folderId}): ${err.message}`);
                 }
-            }
+            });
 
             const nextNum = (maxNum + 1).toString().padStart(2, '0');
             const targetFileName = `${dateStr}_${nextNum}.txt`;
